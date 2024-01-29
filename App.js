@@ -23,32 +23,9 @@ TaskManager.defineTask(LOCATION_TASK_NAME, async ({ data, error }) => {
   }
 });
 export default function App() {
-  const coordinates = [36.806, -1.2921];
 
   const [location, setLocation] = useState([]);
   // AIzaSyAyiLjQV_a_-51OfNYhJZ3nCOx9H8aVWrQ
-  const origin = {
-    latitude: 13.740677759958189,
-    longitude: -89.71184755357582,
-  };
-  const destination = { latitude: 13.778986, longitude: -89.20728 };
-
-  const markers = [
-    {
-      latitude: 13.740677759958189,
-      longitude: -89.71184755357582,
-    },
-    {
-      latitude: 13.741647,
-      longitude: -89.676216,
-    },
-    {
-      latitude: 13.74763,
-      longitude: -89.675591,
-    },
-    { latitude: 13.778986, longitude: -89.20728 },
-  ];
-
   useEffect(() => {
     const requestPermissions = async () => {
       const foreground = await Location.requestForegroundPermissionsAsync();
@@ -68,7 +45,9 @@ export default function App() {
 
     foregroundSubscription = await Location.watchPositionAsync(
       {
-        accuracy: Location.Accuracy.BestForNavigation,
+        accuracy: Location.Accuracy.Highest,
+        timeInterval: 500,
+        distanceInterval: 10,
       },
       async (location) => {
         let regionName = await Location.reverseGeocodeAsync({
@@ -96,15 +75,21 @@ export default function App() {
     <View style={styles.container}>
       <Text>Open up App.js to start working on your app!</Text>
       <MapView zoomEnabled minZoomLevel={1} style={styles.map}>
-        <MapViewDirections
+        {/* <MapViewDirections
           origin={location[0]}
           destination={location[location.length - 1]}
           apikey={"AIzaSyAyiLjQV_a_-51OfNYhJZ3nCOx9H8aVWrQ"}
           strokeWidth={5}
           strokeColor="hotpink"
-        />
-        {markers.map((mark, index) => (
-          <Marker key={index} coordinate={mark} />
+        /> */}
+        {location.map((marker, index) => (
+          <Polyline
+            strokeColors="hotpink"
+            strokeWidth={10}
+            strokeColor="red"
+            coordinates={location}
+            key={index}
+          />
         ))}
       </MapView>
     </View>

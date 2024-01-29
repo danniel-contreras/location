@@ -13,17 +13,19 @@
     "expo": "~50.0.4",
     "expo-location": "~16.5.2",
     "expo-status-bar": "~1.11.1",
+    "expo-task-manager": "~11.7.2",
+    "haversine": "^1.1.1",
     "react": "18.2.0",
     "react-leaflet": "^4.2.1",
     "react-native": "0.73.2",
     "react-native-leaflet": "^0.0.0-reserved",
     "react-native-maps": "^1.10.0",
     "react-native-maps-directions": "^1.9.0",
-    "react-native-webview": "13.6.4",
-    "expo-task-manager": "~11.7.2"
+    "react-native-webview": "13.6.4"
   },
   "devDependencies": {
-    "@babel/core": "^7.20.0"
+    "@babel/core": "^7.20.0",
+    "@types/haversine": "^1.1.8"
   },
   "private": true
 }
