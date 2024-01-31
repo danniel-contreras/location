@@ -6,6 +6,7 @@ import {
   ScrollView,
   Button,
   SafeAreaView,
+  ToastAndroid,
 } from "react-native";
 import { useState, useEffect, useRef } from "react";
 import MapView, { Marker, Polyline, Geojson } from "react-native-maps";
@@ -17,35 +18,104 @@ import {
   initDatabase,
   insertLocation,
   emptyUserLocation,
+  get_by_uuid,
 } from "../../sqlite.ts";
 import * as Crypto from "expo-crypto";
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import haversine from "haversine";
+import * as Network from "expo-network";
 
-const LOCATION_TASK_NAME = "LOCATION_TASK_NAME";
-let foregroundSubscription = null;
+// const LOCATION_TASK_NAME = "LOCATION_TASK_NAME";
+// // Define the background task for location tracking
+// TaskManager.defineTask(LOCATION_TASK_NAME, async ({ data, error }) => {
+//   if (error) {
+//     console.error(error);
+//     return;
+//   }
+//   if (data) {
+//     const { locations } = data;
+//     const location = locations[0];
+//     if (location) {
+//       console.log(
+//         "Location in background ",
+//         Date.now() + " : " + location.coords
+//       );
+//       const uuid = await AsyncStorage.getItem("uuid");
 
-// Define the background task for location tracking
-TaskManager.defineTask(LOCATION_TASK_NAME, async ({ data, error }) => {
-  if (error) {
-    console.error(error);
-    return;
-  }
-  if (data) {
-    const { locations } = data;
-    const location = locations[0];
-    if (location) {
-      console.log("Location in background", location.coords);
-    }
-  }
-});
+//       get_by_uuid(uuid)
+//         .then((res) => {
+//           if (res.length > 0) {
+//             const distance = haversine(
+//               {
+//                 latitude: res[res.length - 1].latitude,
+//                 longitude: res[res.length - 1].longitude,
+//               },
+//               {
+//                 latitude: location.coords.latitude,
+//                 longitude: location.coords.longitude,
+//               },
+//               { unit: "meter", threshold: 1 }
+//             );
+
+//             console.log("Distancia: ", distance);
+
+//             if (distance) {
+//               ToastAndroid.show(
+//                 "You have been " + distance + " meters away from your last location",
+//                 ToastAndroid.SHORT
+//               );
+//               console.log("Guardando");
+//               insertLocation(
+//                 location.coords.latitude,
+//                 location.coords.longitude,
+//                 Date.now(),
+//                 "unknown",
+//                 uuid
+//               );
+//             }
+//           } else {
+//             insertLocation(
+//               location.coords.latitude,
+//               location.coords.longitude,
+//               Date.now(),
+//               "unknown",
+//               uuid
+//             );
+//           }
+//         })
+//         .catch((err) => {
+//           insertLocation(
+//             location.coords.latitude,
+//             location.coords.longitude,
+//             Date.now(),
+//             "unknown",
+//             uuid
+//           );
+//         });
+//     }
+//   }
+//   // 1c9fe9e1917b45cba56160459243101
+// });
 export default function LocationPage({ navigation }) {
   const [location, setLocation] = useState([]);
   // AIzaSyAyiLjQV_a_-51OfNYhJZ3nCOx9H8aVWrQ
   useEffect(() => {
     const requestPermissions = async () => {
+      const ip = await Network.getIpAddressAsync();
+      console.log("IP: ", ip);
       const foreground = await Location.requestForegroundPermissionsAsync();
-      if (foreground.granted)
-        await Location.requestBackgroundPermissionsAsync();
+      if (foreground.granted) {
+        const { status } = await Location.requestBackgroundPermissionsAsync();
+        if (status === "granted") {
+          await Location.enableNetworkProviderAsync();
+          await Location.startLocationUpdatesAsync(LOCATION_TASK_NAME, {
+            accuracy: Location.Accuracy.Highest,
+            timeInterval: 1000,
+            distanceInterval: 1,
+          });
+          return;
+        }
+      }
     };
     (async () => {
       const uuid = Crypto.randomUUID();
@@ -68,7 +138,15 @@ export default function LocationPage({ navigation }) {
   useEffect(() => {
     // Inicializa la referencia a la ubicación actual
     const initializeLocationRef = async () => {
-      const initialLocation = await Location.getCurrentPositionAsync({});
+      const initialLocation = await Location.getCurrentPositionAsync({
+        accuracy: Location.Accuracy.BestForNavigation,
+        timeInterval: 5000,
+        distanceInterval: 5,
+        showsBackgroundLocationIndicator: true,
+      });
+
+      console.log(initialLocation);
+
       locationRef.current = initialLocation;
       if (location.length === 0) {
         setLocation([initialLocation.coords]);
@@ -116,13 +194,16 @@ export default function LocationPage({ navigation }) {
 
     locationRef.current = await Location.getCurrentPositionAsync({});
 
-    foregroundSubscription = await Location.watchPositionAsync(
+    const foregroundSubscription = await Location.watchPositionAsync(
       {
-        accuracy: Location.Accuracy.Highest,
-        timeInterval: 1000,
-        distanceInterval: 1,
+        accuracy: Location.Accuracy.BestForNavigation,
+        timeInterval: 5000,
+        distanceInterval: 5,
+        showsBackgroundLocationIndicator: true,
       },
       async (location) => {
+        console.log(location);
+
         const prevLocation = locationRef.current;
 
         // Calcula la distancia entre la ubicación actual y la anterior utilizando haversine
@@ -136,6 +217,20 @@ export default function LocationPage({ navigation }) {
             longitude: location.coords.longitude,
           }
         );
+
+        const distanceTwo = haversine(
+          {
+            latitude: prevLocation.coords.latitude,
+            longitude: prevLocation.coords.longitude,
+          },
+          {
+            latitude: location.coords.latitude,
+            longitude: location.coords.longitude,
+          }
+        );
+
+        console.log("Distancia1: ", distance);
+        console.log("Distancia2: ", distanceTwo);
 
         const umbralDistancia = 10 / 111000; // Ajusta según sea necesario
         const umbralVariacion = 0.0001; // Ajusta según sea necesario
@@ -158,16 +253,16 @@ export default function LocationPage({ navigation }) {
             },
           ]);
 
-          const uuid = await AsyncStorage.getItem("uuid");
+          // const uuid = await AsyncStorage.getItem("uuid");
 
-          // insertLocation es una función que deberías tener definida en tu código
-          insertLocation(
-            location.coords.latitude,
-            location.coords.longitude,
-            Date.now(),
-            "test",
-            uuid
-          );
+          // // insertLocation es una función que deberías tener definida en tu código
+          // insertLocation(
+          //   location.coords.latitude,
+          //   location.coords.longitude,
+          //   Date.now(),
+          //   "test",
+          //   uuid
+          // );
 
           // Actualiza la referencia a la ubicación anterior
           locationRef.current = location;
